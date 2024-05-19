@@ -2,6 +2,7 @@ import { ScrollView, Text, View, Image } from "react-native";
 import { useWorkshopStore } from "@/store/workshop-store";
 import { useEffect, useState } from "react";
 import { Workshop } from "@/interfaces/workshop";
+import {WorkshopList} from '@/components/workshop/WorkshopCard'
 
 
 export default function TabOneScreen() {
@@ -22,18 +23,7 @@ export default function TabOneScreen() {
         )}
         {status === "success" && (
           <ScrollView>
-            {/* Aqui lo mejor es crear un componente como WorkshopCard donde se muestre la Informacion */}
-            {workshops.map((workshop) => (
-              <View key={workshop.id}>
-                <Image
-                  source={{ uri: "http://192.168.1.29:3000"+workshop.imageUrl }}
-                  style={{ width: 200, height: 200 }}
-                  className="rounded-lg"
-                / >
-                <Text>{workshop.name}</Text>
-                <Text>{workshop.location}</Text>
-              </View>
-            ))}
+            <WorkshopList data={workshops} title={"List of workshops"}/>
           </ScrollView>
         )}
       </View>
