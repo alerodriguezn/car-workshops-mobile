@@ -15,8 +15,8 @@ export default function TabOneScreen() {
   }, []);
 
   return (
-    <View className=" bg-white">
-      <Text className="text-center text-3xl">Workshops</Text>
+    <View className="flex-1 bg-[#030418]">
+      <Text className="text-center text-3xl text-white font-bold">Workshops</Text>
       <View className="">
         {status === "loading" && (
           <Text className="text-center">Loading...</Text>
