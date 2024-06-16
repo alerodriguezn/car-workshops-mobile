@@ -45,7 +45,7 @@ interface WorkshopCardProps {
 
 const WorkshopCard = ({ item }: WorkshopCardProps) => {
   const handlePress = () => {
-    router.push(`/`);
+    router.push(`/workshop/${item.id}`);
   };
 
   return (

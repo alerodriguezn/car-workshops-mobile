@@ -1,226 +1,142 @@
-import {
-  Text,
-  View,
-  TextInput,
-  Button,
-  Alert,
-  Image,
-  StyleSheet,
-} from "react-native";
-import { useForm, Controller } from "react-hook-form";
-import * as ImagePicker from "expo-image-picker";
-import { useState } from "react";
-import axiosClient from "@/config/axiosClient";
+import { useAuthStore } from "@/store/auth-store";
+import { router } from "expo-router";
+import { View, Text, Pressable, ScrollView, RefreshControl } from "react-native";
+import { useAppointmentsStore } from "@/store/appointments-store";
+import { useEffect } from "react";
+import React from "react";
 
-type FormData = {
-  make: string;
-  model : string;
-  year: string;
-  clientId: string;
-  workshopId: string;
-  description: string;
+const statusColor = {
+  Pending: "text-yellow-500",
+  Created: "text-blue-500",
+  Approved: "text-green-500",
 };
 
 export default function App() {
-  const {
-    control,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<FormData>({
-    defaultValues: {
-      description: "",
-      year: "",
-      make: "",
-      clientId: "",
-      workshopId: "",
-      
-    },
-  });
-  const onSubmit = async (data: FormData) => {
-    if (image) {
-      let localUri = image;
-      let filename = localUri.split("/").pop() as string;
 
-      let match = /\.(\w+)$/.exec(filename);
-      let type = match ? `image/${match[1]}` : `image`;
 
-      let formData = new FormData();
-      // as File
-      formData.append("media", { uri: localUri, name: filename, type } as any);
-      formData.append("description", data.description);
-      formData.append("make", data.make);
-      formData.append("model", data.model);
-      formData.append("year", data.year);
-      formData.append("clientId", data.clientId);
-      formData.append("workshopId", data.workshopId);
+  const [refreshing, setRefreshing] = React.useState(false);
 
-      console.log(formData);
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 2000);
 
-      try {
-        await fetch("http://192.168.1.29:3000/api/appointment", 
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-          body: formData,
-        });
-        
-      } catch (error) {
-        console.error(error);
-      }
+    fetchAppointments(clientId);
 
+  }, []);
+
+
+
+
+  const clientId = useAuthStore((state) => state.clientId);
+  const fetchAppointments = useAppointmentsStore(
+    (state) => state.fetchAppointmentByClientId
+  );
+  const appointments = useAppointmentsStore((state) => state.appointments);
+  const approveAppointment = useAppointmentsStore(
+    (state) => state.approveAppointment
+  );
+
+  useEffect(() => {
+    if (clientId) {
+      fetchAppointments(clientId);
     }
-  };
+  }, [clientId]);
 
-  const [image, setImage] = useState<string | null>(null);
 
-  const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
+  const handleAcceptAppointment = async (appointmentId: number) => {
+    await approveAppointment(appointmentId);
+    fetchAppointments(clientId);
+  }
 
-    console.log(result);
-
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
-    }
-  };
+  if (!clientId) {
+    return (
+      <View className="h-full w-full flex justify-center items-center">
+        <Text className="text-white text-xl font-bold">
+          You Are Not Logged In
+        </Text>
+        <Pressable
+          className="text-white text-lg bg-blue-600 rounded p-2 mt-2"
+          onPress={() => {
+            router.push("/login");
+          }}
+        >
+          <Text className="text-white">Login</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
-    <View className="flex flex-col justify-center items-center pt-12 bg-[#030418] flex-1">
-      <Text className="text-white text-3xl font-bold mb-4">
-        Description of the problem
+    <ScrollView className="flex-1 bg-[#030418]"
+
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }>
+      <Text className="text-2xl text-white font-bold text-center">
+        Appointments
       </Text>
+      {appointments.length > 0 ? (
+        <View className="flex-1">
+          {appointments.map((appointment) => (
+            <View
+              className="p-4 bg-[#1F1F1F] rounded-lg my-2"
+              key={appointment.id}
+            >
+              <Text
+                className={`text-amber-400 text-lg font-semibold underline`}
+              >
+                {appointment.status}
+              </Text>
+              <Text className="text-gray-500 text-sm font-bold">
+                {appointment.date
+                  ? new Date(appointment.date).toDateString()
+                  : "The workshop has not proposed a date yet."}
+              </Text>
+              <Text className="text-gray-500 text-sm font-bold">
+                Workshop ID : {appointment.workshopId}
+              </Text>
+              <Text className="text-gray-500 text-sm">
+                Problem: {appointment.appointmentDetail.description}
+              </Text>
+              {appointment.status === "Approved" && (
+                <Pressable className="w-full bg-green-600 rounded-lg h-8 mt-2" onPress={
+                  () => {
+                    router.push(`/repairs/${appointment.id}`);
+                  }
+                
+                }>
+                  <Text className="text-white text-center font-bold p-2">
+                    View Details
+                  </Text>
+                </Pressable>
+              )}
+              {appointment.status === "Created" && (
+                <Pressable className="w-full bg-sky-600 rounded-lg h-8 mt-2" onPress={() => handleAcceptAppointment(appointment.id)}>
+                  <Text className="text-white text-center font-bold p-2">
+                    Accept Appointment
+                  </Text>
+                </Pressable>
+              )}
 
-      <Controller
-        control={control}
-        rules={{
-          required: true,
-        }}
-        render={({ field: { onChange, onBlur, value } }) => (
-          <TextInput
-            className="w-64 h-10 border-2 border-gray-300 rounded-lg px-2 mb-4 text-white placeholder-white"
-            placeholder="Description"
-            onBlur={onBlur}
-            onChangeText={onChange}
-            value={value}
-          />
-        )}
-        name="description"
-      />
-      {errors.description && <Text>This is required.</Text>}
-
-      <Controller
-        control={control}
-        rules={{
-          maxLength: 100,
-        }}
-        render={({ field: { onChange, onBlur, value } }) => (
-          <TextInput
-            className="w-64 h-10 border-2 border-gray-300 rounded-lg px-2 mb-4 text-white placeholder-white"
-            placeholder="Make"
-            onBlur={onBlur}
-            onChangeText={onChange}
-            value={value}
-          />
-        )}
-        name="make"
-      />
-      {errors.make && <Text>Make is too long.</Text>}
-
-      <Controller
-        control={control}
-        rules={{
-          maxLength: 100,
-        }}
-        render={({ field: { onChange, onBlur, value } }) => (
-          <TextInput
-            className="w-64 h-10 border-2 border-gray-300 rounded-lg px-2 mb-4 text-white placeholder-white"
-            placeholder="Model"
-            onBlur={onBlur}
-            onChangeText={onChange}
-            value={value}
-          />
-        )}
-        name="model"
-
-      />
-
-      <Controller
-        control={control}
-        rules={{
-          maxLength: 100,
-        }}
-        render={({ field: { onChange, onBlur, value } }) => (
-          <TextInput
-            className="w-64 h-10 border-2 border-gray-300 rounded-lg px-2 mb-4 text-white placeholder-white"
-            placeholder="Year"
-            onBlur={onBlur}
-            onChangeText={onChange}
-            value={value}
-          />
-        )}
-        name="year"
-      />
-
-      <Controller
-        control={control}
-        rules={{
-          maxLength: 100,
-        }}
-        render={({ field: { onChange, onBlur, value } }) => (
-          <TextInput
-            className="w-64 h-10 border-2 border-gray-300 rounded-lg px-2 mb-4 text-white placeholder-white"
-            placeholder="Client ID"
-            onBlur={onBlur}
-            onChangeText={onChange}
-            value={value}
-          />
-        )}
-        name="clientId"
-      />
-
-      <Controller
-        control={control}
-        rules={{
-          maxLength: 100,
-        }}
-        render={({ field: { onChange, onBlur, value } }) => (
-          <TextInput
-            className="w-64 h-10 border-2 border-gray-300 rounded-lg px-2 mb-4 text-white placeholder-white"
-            placeholder="Workshop ID"
-            onBlur={onBlur}
-            onChangeText={onChange}
-            value={value}
-          />
-        )}
-        name="workshopId"
-      />
-
-
-      <Button title="Pick an image from camera roll" onPress={pickImage} />
-
-      {image && (
-        <Image source={{ uri: image }} style={styles.image} className="mb-4" />
+              {appointment.status === "Completed" && (
+                <Pressable className="w-full bg-yellow-600 rounded-lg h-8 mt-2" onPress={() => router.push(`/payment/${appointment.id}`)}>
+                  <Text className="text-white text-center font-bold p-2">
+                  View Invoice
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          ))}
+        </View>
+      ) : (
+        <View className="h-full w-full flex justify-center items-center">
+          <Text className="text-white text-xl font-bold">
+            No Appointments Found
+          </Text>
+        </View>
       )}
-
-      <Button title="Submit" onPress={handleSubmit(onSubmit)} color="#841584" />
-    </View>
+    </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  image: {
-    width: 50,
-    height: 50,
-  },
-});
